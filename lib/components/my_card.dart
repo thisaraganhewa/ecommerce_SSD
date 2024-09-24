@@ -28,8 +28,6 @@ class _MyItemCardState extends State<MyItemCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // width: 150,
-      // height: 280,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
         color: primaryColor.withOpacity(0.5),
@@ -55,7 +53,6 @@ class _MyItemCardState extends State<MyItemCard> {
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   Text(
                     widget.itemName,
@@ -63,73 +60,83 @@ class _MyItemCardState extends State<MyItemCard> {
                       fontSize: 24,
                     ),
                   ),
-                  Text("\$ ${widget.itemAmount}"),
+                  Text("\$ ${widget.itemAmount.toStringAsFixed(2)}"),
                 ],
               ),
               StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection("wishlist")
-                      .where("user-id", isEqualTo: widget.userId)
-                      .where("inventory-id", isEqualTo: widget.itemId)
-                      .snapshots(),
-                  builder: (context, wishlist) {
-                    if (!wishlist.hasData) {
-                      return CircularProgressIndicator(color: primaryColor,);
-                    }
-                    return IconButton(
-                      onPressed: () async {
+                stream: FirebaseFirestore.instance
+                    .collection("wishlist")
+                    .where("user-id", isEqualTo: widget.userId)
+                    .where("inventory-id", isEqualTo: widget.itemId)
+                    .snapshots(),
+                builder: (context, wishlist) {
+                  if (!wishlist.hasData) {
+                    return Center(child: CircularProgressIndicator(color: primaryColor));
+                  }
+                  return IconButton(
+                    onPressed: () async {
+                      try {
                         if (wishlist.data!.size == 0) {
-                          FirebaseFirestore.instance
-                              .collection("wishlist")
-                              .add({
+                          await FirebaseFirestore.instance.collection("wishlist").add({
                             "inventory-id": widget.itemId,
                             "user-id": widget.userId,
                           });
                         } else {
-                          FirebaseFirestore.instance
+                          await FirebaseFirestore.instance
                               .collection("wishlist")
                               .doc(wishlist.data!.docs.first.id)
                               .delete();
                         }
-                      },
-                      icon: Icon(
-                        (wishlist.data!.size == 0)?Icons.favorite_border_rounded:Icons.favorite_rounded,
-                        color: (wishlist.data!.size == 0)?Colors.black:primaryColor,
-                      ),
-                    );
-                  }),
+                      } catch (e) {
+                        // Handle error, e.g., show a Snackbar or Toast
+                        print("Error: $e");
+                      }
+                    },
+                    icon: Icon(
+                      (wishlist.data!.size == 0)
+                          ? Icons.favorite_border_rounded
+                          : Icons.favorite_rounded,
+                      color: (wishlist.data!.size == 0) ? Colors.black : primaryColor,
+                    ),
+                  );
+                },
+              ),
             ],
           ),
           VerticalSpacer(16),
           StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection("cart")
-                  .where("user-id", isEqualTo: widget.userId)
-                  .where("inventory-id", isEqualTo: widget.itemId)
-                  .snapshots(),
-              builder: (context, cartSS) {
-                if (!cartSS.hasData) {
-                  return CircularProgressIndicator(color: primaryColor,);
-                }
-                return cartSS.data!.size == 1
-                    ? Text(
-                        "Added to cart",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : MyButton(
-                        text: "Add to cart",
-                        onPressed: () async {
-                          await FirebaseFirestore.instance
-                              .collection("cart")
-                              .add({
+            stream: FirebaseFirestore.instance
+                .collection("cart")
+                .where("user-id", isEqualTo: widget.userId)
+                .where("inventory-id", isEqualTo: widget.itemId)
+                .snapshots(),
+            builder: (context, cartSS) {
+              if (!cartSS.hasData) {
+                return Center(child: CircularProgressIndicator(color: primaryColor));
+              }
+              return cartSS.data!.size == 1
+                  ? Text(
+                      "Added to cart",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : MyButton(
+                      text: "Add to cart",
+                      onPressed: () async {
+                        try {
+                          await FirebaseFirestore.instance.collection("cart").add({
                             "user-id": widget.userId,
                             "inventory-id": widget.itemId,
                           });
-                        },
-                      );
-              }),
+                        } catch (e) {
+                          // Handle error
+                          print("Error: $e");
+                        }
+                      },
+                    );
+            },
+          ),
         ],
       ),
     );

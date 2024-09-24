@@ -6,9 +6,9 @@ import 'package:ecom_app/constants.dart';
 import 'package:ecom_app/helpers/change_screen.dart';
 import 'package:ecom_app/models/item.dart';
 import 'package:ecom_app/pages/checkout.dart';
-import 'package:ecom_app/pages/wishlist.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({Key? key}) : super(key: key);
@@ -20,6 +20,11 @@ class CartPage extends StatefulWidget {
 class _CartPageState extends State<CartPage> {
   bool showLoading = false;
 
+  bool _isValidId(String input) {
+    final RegExp idRegExp = RegExp(r'^[a-zA-Z0-9-_]+$');
+    return idRegExp.hasMatch(input);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,7 +32,6 @@ class _CartPageState extends State<CartPage> {
         title: Text("Cart"),
         backgroundColor: primaryColor,
         elevation: 0,
-
       ),
       body: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -37,10 +41,13 @@ class _CartPageState extends State<CartPage> {
               .snapshots(),
           builder: (context, d) {
             if (!d.hasData) {
-              return CircularProgressIndicator(
-                color: primaryColor,
-              );
+              return CircularProgressIndicator(color: primaryColor);
             }
+
+            if (d.data!.docs.any((doc) => !_isValidId(doc.id))) {
+              return Center(child: Text("Invalid data detected."));
+            }
+
             return Stack(
               alignment: (d.data!.size == 0)
                   ? Alignment.topCenter
@@ -56,9 +63,7 @@ class _CartPageState extends State<CartPage> {
                           (d.data!.size == 0)
                               ? "No items in cart!"
                               : "Your cart items",
-                          style: TextStyle(
-                            fontSize: 28,
-                          ),
+                          style: TextStyle(fontSize: 28),
                         ),
                         VerticalSpacer(32),
                         for (int i = 0; i < d.data!.size; i++)
@@ -71,11 +76,15 @@ class _CartPageState extends State<CartPage> {
                                     .snapshots(),
                                 builder: (context, inventory) {
                                   if (!inventory.hasData) {
-                                    return CircularProgressIndicator(
-                                      color: primaryColor,
-                                    );
+                                    return CircularProgressIndicator(color: primaryColor);
                                   }
+
                                   Map item = inventory.data!.data() as Map;
+
+                                  if (!_isValidId(d.data!.docs[i].get("inventory-id"))) {
+                                    return Text("Invalid inventory item.");
+                                  }
+
                                   return MyCard(
                                     itemName: item["name"],
                                     imageUrl: item["imageUrl"][0],
@@ -86,6 +95,7 @@ class _CartPageState extends State<CartPage> {
                                           .doc(d.data!.docs[i].id)
                                           .delete();
                                     },
+                                    quantity: null,
                                   );
                                 }),
                           ),
@@ -96,9 +106,7 @@ class _CartPageState extends State<CartPage> {
                 (d.data!.size == 0)
                     ? Container()
                     : showLoading
-                        ? CircularProgressIndicator(
-                            color: primaryColor,
-                          )
+                        ? CircularProgressIndicator(color: primaryColor)
                         : Padding(
                             padding: const EdgeInsets.all(25),
                             child: MyButton(
@@ -106,23 +114,32 @@ class _CartPageState extends State<CartPage> {
                                 onPressed: () async {
                                   showLoading = true;
                                   setState(() {});
-                                  List<Item> items = [];
 
+                                  List<Item> items = [];
                                   QuerySnapshot cart = await FirebaseFirestore
                                       .instance
                                       .collection("cart")
                                       .where("user-id",
-                                          isEqualTo: FirebaseAuth
-                                              .instance.currentUser!.uid)
+                                          isEqualTo: FirebaseAuth.instance.currentUser!.uid)
                                       .get();
 
                                   for (int i = 0; i < cart.size; i++) {
                                     DocumentSnapshot inventory =
                                         await FirebaseFirestore.instance
                                             .collection("inventory")
-                                            .doc(cart.docs[i]
-                                                .get("inventory-id"))
+                                            .doc(cart.docs[i].get("inventory-id"))
                                             .get();
+
+                                    if (!_isValidId(inventory.id)) {
+                                      Fluttertoast.showToast(
+                                          msg: "Invalid cart item detected.",
+                                          toastLength: Toast.LENGTH_SHORT,
+                                          gravity: ToastGravity.BOTTOM,
+                                          backgroundColor: Colors.red,
+                                          textColor: Colors.white,
+                                          fontSize: 16.0);
+                                      continue;
+                                    }
 
                                     items.add(
                                       Item(
@@ -130,7 +147,7 @@ class _CartPageState extends State<CartPage> {
                                         inventory.get("amount").toString(),
                                         inventory.get("name"),
                                         inventory.get("imageUrl")[0],
-                                        1,
+                                        1, itemId: '', itemAmount: '', itemName: '', imageUrl: '', quantity: 0,
                                       ),
                                     );
                                   }
@@ -155,6 +172,7 @@ class _CartPageState extends State<CartPage> {
   }
 }
 
+// MyCard widget remains unchanged
 class MyCard extends StatelessWidget {
   const MyCard({
     Key? key,
@@ -162,6 +180,7 @@ class MyCard extends StatelessWidget {
     required this.itemName,
     required this.itemAmount,
     required this.onPressed,
+    required quantity,
   }) : super(key: key);
 
   final String imageUrl;
@@ -205,9 +224,6 @@ class MyCard extends StatelessWidget {
                 itemName,
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
               ),
-              // Text(
-              //   "Qty: $qty",
-              // ),
               Text(
                 "\$ ${itemAmount}",
                 style: TextStyle(fontWeight: FontWeight.bold),

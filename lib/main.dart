@@ -8,21 +8,23 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'constants.dart' as constraint;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: FirebaseOptions(
-      apiKey: "AIzaSyDUK_opszFZSNgzr5Rp6GtDt7mkpmO89Lg",
-      appId: "1:343660851275:web:7040ef8287fd2f9a7c1dce",
-      messagingSenderId: "343660851275",
-      projectId: "fir-project-426e2",
-    ),
-  );
-
-  runApp(
-    App(),
-  );
+  try {
+    await Firebase.initializeApp(
+      options: FirebaseOptions(
+        apiKey: constraint.apikey,
+        appId: constraint.appId,
+        messagingSenderId: constraint.messagingSenderId,
+        projectId: constraint.projectId,
+      ),
+    );
+  } catch (e) {
+    print("Failed to initialize Firebase: $e");
+  }
+  runApp(App());
 }
 
 class App extends StatefulWidget {
@@ -33,6 +35,19 @@ class App extends StatefulWidget {
 }
 
 class _AppState extends State<App> {
+
+  // Function to validate email format
+  bool isValidEmail(String email) {
+    String pattern = r'^[^@]+@[^@]+\.[^@]+';
+    RegExp regExp = RegExp(pattern);
+    return regExp.hasMatch(email);
+  }
+
+  // Function to sanitize email input
+  String sanitizeEmail(String email) {
+    return email.trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -42,25 +57,31 @@ class _AppState extends State<App> {
         canvasColor: Colors.white,
         colorScheme: Theme.of(context).colorScheme.copyWith(
           primary: primaryColor,
-          // background: Colors.red,
           secondary: primaryColor,
         ),
       ),
       home: StreamBuilder<User?>(
-          stream: FirebaseAuth.instance.authStateChanges(),
-          builder: (context, user) {
-            if (user.hasData) {
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, user) {
+          if (user.hasData) {
+            String? userEmail = user.data?.email;
+
+            // Check if the email is valid and sanitized
+            if (userEmail != null && isValidEmail(userEmail)) {
+              String sanitizedEmail = sanitizeEmail(userEmail);
+
               return StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection("admin")
-                    .where("email", isEqualTo: user.data!.email)
+                    .where("email", isEqualTo: sanitizedEmail)
                     .snapshots(),
                 builder: (context, adminSnapshot) {
                   if (adminSnapshot.hasData) {
                     if (adminSnapshot.data!.size == 1) {
-                      // TODO
+                      // If the user is an admin, navigate to AdminPage
                       return AdminPage();
                     } else {
+                      // Otherwise, navigate to HomePage
                       return HomePage();
                     }
                   }
@@ -73,9 +94,14 @@ class _AppState extends State<App> {
                   );
                 },
               );
+            } else {
+              // If email is invalid, navigate to RegisterPage
+              return RegisterPage();
             }
+          }
+          // If no user is logged in, show RegisterPage
           return RegisterPage();
-        }
+        },
       ),
     );
   }

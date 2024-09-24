@@ -12,6 +12,23 @@ import 'package:flutter/material.dart';
 class HomePage extends StatelessWidget {
   const HomePage({Key? key}) : super(key: key);
 
+  // Function to validate string inputs
+  bool _isValidString(String? input) {
+    return input != null && input.isNotEmpty && input.length <= 100;
+  }
+
+  // Function to validate number inputs
+  bool _isValidNumber(dynamic amount) {
+    return amount != null && amount is num;
+  }
+
+  // Function to validate URL
+  bool _isValidUrl(String? url) {
+    if (url == null) return false;
+    final Uri? uri = Uri.tryParse(url);
+    return uri != null && (uri.isScheme('http') || uri.isScheme('https'));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,38 +94,37 @@ class HomePage extends StatelessWidget {
                     String userId = FirebaseAuth.instance.currentUser!.uid;
                     String itemId = d.data!.docs[index].id;
                     Map item = d.data!.docs[index].data() as Map;
+
+                    // Validate item fields
+                    String? itemName = _isValidString(item["name"]) ? item["name"] : "Unknown Item";
+                    double itemAmount = _isValidNumber(item["amount"]) ? (item["amount"] as num).toDouble() : 0.0;
+                    List<String> images = item["imageUrl"] is List && item["imageUrl"].every(_isValidUrl)
+                        ? List<String>.from(item["imageUrl"])
+                        : ["https://example.com/default_image.jpg"]; // default image if invalid
+
                     return InkWell(
                       onTap: () {
                         changeScreen(
                             context,
                             ItemDetailsPage(
-                              itemName: item["name"],
-                              itemAmount: item["amount"],
-                              description: item["description"],
-                              images: item["imageUrl"],
-                              mainImageUrl: item["imageUrl"][0],
+                              itemName: itemName!,
+                              itemAmount: itemAmount,
+                              description: _isValidString(item["description"]) ? item["description"] : "No description available.",
+                              images: images,
+                              mainImageUrl: images[0], // first valid image
                               userId: userId,
                               itemId: itemId,
                             ));
                       },
                       child: MyItemCard(
-                        imageUrl: item["imageUrl"][0],
-                        itemAmount: item["amount"],
-                        itemName: item["name"],
+                        imageUrl: images[0],
+                        itemAmount: itemAmount,
+                        itemName: itemName!,
                         itemId: itemId,
                         userId: userId,
                       ),
                     );
                   },
-                  // children: [
-                  //   for (int i = 0; i < 10; i++)
-                  //     InkWell(
-                  //       onTap: () {
-                  //         changeScreen(context, ItemDetailsPage());
-                  //       },
-                  //       child: MyItemCard(),
-                  //     ),
-                  // ],
                 );
               }),
         ),

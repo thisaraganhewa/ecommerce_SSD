@@ -44,6 +44,8 @@ dependencies:
   google_fonts: ^4.0.4
   url_launcher: ^6.1.11
   markdown_widget: ^2.2.0
+  fluttertoast: ^8.2.8
+  google_sign_in: ^6.2.1
 
 
 dev_dependencies:

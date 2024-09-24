@@ -24,6 +24,20 @@ class _WishlistPageState extends State<WishlistPage> {
 
   @override
   Widget build(BuildContext context) {
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+     if (currentUser == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text("Wishlist"),
+          backgroundColor: primaryColor,
+          elevation: 0,
+        ),
+        body: Center(child: Text("Please log in to view your wishlist.")),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Wishlist"),
@@ -35,7 +49,7 @@ class _WishlistPageState extends State<WishlistPage> {
           stream: FirebaseFirestore.instance
               .collection("wishlist")
               .where("user-id",
-              isEqualTo: FirebaseAuth.instance.currentUser!.uid)
+              isEqualTo: currentUser.uid)
               .snapshots(),
           builder: (context, d) {
             if (!d.hasData) {
@@ -98,7 +112,7 @@ class _WishlistPageState extends State<WishlistPage> {
                                         .collection("wishlist")
                                         .doc(d.data!.docs[i].id)
                                         .delete();
-                                  },
+                                  }, quantity: null,
                                 ),
                               );
                             }),

@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ecom_app/components/footer.dart';
 import 'package:ecom_app/components/my_spacer.dart';
 import 'package:ecom_app/constants.dart';
-import 'package:ecom_app/helpers/change_screen.dart';
+import 'package:ecom_app/helpers/change_screen.dart'; // Ensure this import is here
 import 'package:ecom_app/models/item.dart';
 import 'package:ecom_app/pages/home.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -33,9 +33,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool isCreditCard = false, isDebitCard = false, isCashOnDel = false;
 
   getTotalAmount() {
+    totalAmount = 0.0; // Reset total amount
     widget.items.forEach((item) {
       totalAmount += double.parse(item.itemAmount) * item.quantity;
     });
+  }
+
+  // Solution 1: Name validation - only allows alphabet and spaces
+  bool isValidName(String name) {
+    final RegExp nameRegex = RegExp(r"^[a-zA-Z\s]+$");
+    return nameRegex.hasMatch(name);
+  }
+
+  // Solution 2: Phone number validation - valid phone number format
+  bool isValidPhoneNumber(String phone) {
+    final RegExp phoneRegex =
+        RegExp(r'^\+?[0-9]{7,15}$'); // Allows international format
+    return phoneRegex.hasMatch(phone);
+  }
+
+  // Solution 3: Address sanitization - basic sanitation to remove harmful characters
+  String sanitizeAddress(String address) {
+    final RegExp addressRegex = RegExp(r'[^a-zA-Z0-9\s,.-]');
+    return address.replaceAll(
+        addressRegex, ''); // Removes all invalid characters
   }
 
   @override
@@ -85,16 +106,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   ],
                 ),
               ),
-              SizedBox(
-                height: 32,
-              ),
+              SizedBox(height: 32),
               Theme(
                 data: ThemeData(
                   textTheme: GoogleFonts.kanitTextTheme(),
                   canvasColor: primaryColor,
                   colorScheme: Theme.of(context).colorScheme.copyWith(
                         primary: primaryColor,
-                        // background: Colors.red,
                         secondary: primaryColor,
                       ),
                 ),
@@ -105,7 +123,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       title: Text("Billing Address"),
                       content: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
                           VerticalSpacer(12),
                           SizedBox(
@@ -118,6 +135,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
+                              onChanged: (value) {
+                                if (!isValidName(value)) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          "Invalid name! Only letters and spaces allowed."),
+                                    ),
+                                  );
+                                }
+                              },
                             ),
                           ),
                           VerticalSpacer(12),
@@ -131,6 +158,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
+                              onChanged: (value) {
+                                addressController.text = sanitizeAddress(value);
+                                addressController.selection =
+                                    TextSelection.fromPosition(
+                                  TextPosition(
+                                      offset: addressController.text.length),
+                                );
+                              },
                             ),
                           ),
                           VerticalSpacer(12),
@@ -144,6 +179,16 @@ class _CheckoutPageState extends State<CheckoutPage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
+                              onChanged: (value) {
+                                if (!isValidPhoneNumber(value)) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content:
+                                          Text("Invalid phone number format!"),
+                                    ),
+                                  );
+                                }
+                              },
                             ),
                           ),
                           VerticalSpacer(12),
@@ -161,8 +206,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                               Checkbox(
                                 value: isCreditCard,
                                 onChanged: (value) {
-                                  isCreditCard = !isCreditCard;
-                                  setState(() {});
+                                  setState(() {
+                                    isCreditCard = !isCreditCard;
+                                  });
                                 },
                               ),
                               Text("Credit Card"),
@@ -173,8 +219,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                               Checkbox(
                                 value: isDebitCard,
                                 onChanged: (value) {
-                                  isDebitCard = !isDebitCard!;
-                                  setState(() {});
+                                  setState(() {
+                                    isDebitCard = !isDebitCard;
+                                  });
                                 },
                               ),
                               Text("Debit Card"),
@@ -185,11 +232,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
                               Checkbox(
                                 value: isCashOnDel,
                                 onChanged: (value) {
-                                  isCashOnDel = !isCashOnDel!;
-                                  setState(() {});
+                                  setState(() {
+                                    isCashOnDel = !isCashOnDel;
+                                  });
                                 },
                               ),
-                              Text("Cash On  Delivery"),
+                              Text("Cash On Delivery"),
                             ],
                           ),
                         ],
@@ -208,7 +256,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           for (int i = 0; i < widget.items.length; i++)
                             Text(
                                 "Item ${i + 1}: ${widget.items[i].itemName}; amount: ${widget.items[i].itemAmount}; quantity: ${widget.items[i].quantity}"),
-                          Text("Total Amount: ${totalAmount}"),
+                          Text("Total Amount: \$${totalAmount}"),
                         ],
                       ),
                     ),
@@ -216,16 +264,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   currentStep: stepperIndex,
                   onStepContinue: () async {
                     if (stepperIndex == 0) {
-                      if (nameController.text.isNotEmpty &&
+                      if (isValidName(nameController.text) &&
                           addressController.text.isNotEmpty &&
-                          phoneNoController.text.isNotEmpty) {
+                          isValidPhoneNumber(phoneNoController.text)) {
                         stepperIndex = 1;
                         setState(() {});
                       }
                     } else if (stepperIndex == 1) {
-                      if (isCreditCard != false ||
-                          isDebitCard != false ||
-                          isCashOnDel != false) {
+                      if (isCreditCard || isDebitCard || isCashOnDel) {
                         stepperIndex = 2;
                         getTotalAmount();
                         setState(() {});
@@ -236,115 +282,48 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           content: Text("Your Order has been placed"),
                         ),
                       );
-                      Map itemQuant = {};
-                      for(int index=0; index<widget.items.length; index++){
+
+                      for (int index = 0;
+                          index < widget.items.length;
+                          index++) {
                         DocumentSnapshot i = await FirebaseFirestore.instance
                             .collection("inventory")
                             .doc(widget.items[index].itemId)
                             .get();
-
                         await FirebaseFirestore.instance
                             .collection("inventory")
                             .doc(widget.items[index].itemId)
                             .update({
-                          "quantity": i.get("quantity") - widget.items[index].quantity
+                          "quantity":
+                              i.get("quantity") - widget.items[index].quantity,
                         });
-
-                        itemQuant[widget.items[index].itemId] = widget.items[index].quantity;
                       }
 
-                      DocumentReference orders = await FirebaseFirestore
-                          .instance
+                      await FirebaseFirestore.instance
                           .collection("orders")
-                          .add(
-                        {
-                          "userId": FirebaseAuth.instance.currentUser!.uid,
-                          "inventory": itemQuant,
-                          "address": addressController.text,
-                          "phoneNumber": phoneNoController.text,
-                          "name": nameController.text,
-                          "paymentType": isCreditCard
-                              ? 1
-                              : isDebitCard
-                                  ? 2
-                                  : isCashOnDel
-                                      ? 3
-                                      : 0,
-                          "status": "in-progress",
-                          "totalAmount": totalAmount,
-                        },
-                      );
-
-                      if (widget.page == 2) {
-                        QuerySnapshot cart = await FirebaseFirestore.instance
-                            .collection("cart")
-                            .where("user-id",
-                                isEqualTo:
-                                    FirebaseAuth.instance.currentUser!.uid)
-                            .get();
-
-                        for (int i = 0; i < cart.size; i++) {
-                          await FirebaseFirestore.instance
-                              .collection("cart")
-                              .doc(cart.docs[i].id)
-                              .delete();
-                        }
-                      }
-
-                      // send e-mail
-                      // MailgunClient client = MailgunClient(
-                      //   "sandbox3bb3c37bd6ed41ada545edc43e29e8ea.mailgun.org",
-                      //   "53cc1920958c629c60d8ce2ec2ee95d9-70c38fed-19ce17cb",
-                      // );
-                      //
-                      // var messageClient = client.message;
-                      // var params = MessageParams(
-                      //   "Demo Project no-reply@sandbox3bb3c37bd6ed41ada545edc43e29e8ea.mailgun.org",
-                      //   [FirebaseAuth.instance.currentUser!.email!],
-                      //   'Your order confirmation for ${orders.id}',
-                      //   MessageContent.text('Items details to be displayed here'),
-                      // );
-                      // var response = await messageClient.send(params);
-                      //
-                      // print(response.statusCode);
-                      // await response.body!.then((value) => print(value));
-
-                      // var response = await http.post(
-                      //   Uri.https(
-                      //     "api.mailgun.net",
-                      //     "/v3/sandbox3bb3c37bd6ed41ada545edc43e29e8ea.mailgun.org/messages",
-                      //   ),
-                      //   headers: {
-                      //     "api":
-                      //         "53cc1920958c629c60d8ce2ec2ee95d9-70c38fed-19ce17cb",
-                      //     "Access-Control-Allow-Origin": "*",
-                      //   },
-                      //   body: jsonEncode(
-                      //     {
-                      //       "from":
-                      //           "Excited User user@sandbox3bb3c37bd6ed41ada545edc43e29e8ea.mailgun.org",
-                      //       "to": [FirebaseAuth.instance.currentUser!.email],
-                      //       "subject": "Your order confirmation for ${orders.id}",
-                      //       "text": "Items details to be displayed here"
-                      //     },
-                      //   ),
-                      // );
-                      //
-                      // print(response.statusCode);
-                      // print(response.body);
-
-                      // Navigator.pushReplacement(
-                      //   context,
-                      //   MaterialPageRoute(
-                      //     builder: (context) {
-                      //       return InventoryPage();
-                      //     },
-                      //   ),
-                      // );
-
-                      Navigator.pop(context);
-                      Navigator.pop(context);
-                      changeScreenWithReplacement(context, HomePage());
+                          .add({
+                        "userId": FirebaseAuth.instance.currentUser!.uid,
+                        "inventory":
+                            widget.items.map((item) => item.toMap()).toList(),
+                        "address": addressController.text,
+                        "phoneNumber": phoneNoController.text,
+                        "name": nameController.text,
+                        "paymentType": isCashOnDel
+                            ? "Cash on delivery"
+                            : isCreditCard
+                                ? "Credit card"
+                                : "Debit card",
+                        "status": "Placed",
+                        "totalAmount": totalAmount,
+                      }).then((value) {
+                        changeScreenWithReplacement(context, HomePage());
+                      });
+                    }
+                  },
+                  onStepCancel: () {
+                    if (stepperIndex > 0) {
+                      stepperIndex--;
+                      setState(() {});
                     }
                   },
                 ),

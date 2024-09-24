@@ -22,18 +22,28 @@ class _OrdersPageState extends State<OrdersPage> {
     getInventoryData();
   }
 
-  getInventoryData() async {
-    showLoading = true;
-    setState(() {});
+ getInventoryData() async {
+  showLoading = true;
+  setState(() {});
+  
+  try {
     QuerySnapshot inventory =
         await FirebaseFirestore.instance.collection("inventory").get();
 
     for (int i = 0; i < inventory.size; i++) {
       inventoryData[inventory.docs[i].id] = inventory.docs[i].data();
     }
+  } catch (e) {
+    // Handle Firestore exceptions
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Error fetching inventory data: $e")),
+    );
+  } finally {
     showLoading = false;
     setState(() {});
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

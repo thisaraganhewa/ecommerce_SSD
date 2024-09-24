@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ecom_app/components/my_button.dart';
 import 'package:ecom_app/components/my_spacer.dart';
-import 'package:ecom_app/constants.dart';
+import 'package:ecom_app/pages/cart.dart';
 import 'package:flutter/material.dart';
 
 class InventoryPage extends StatelessWidget {
@@ -12,7 +12,7 @@ class InventoryPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text("Inventory"),
-        backgroundColor: primaryColor,
+        backgroundColor: Colors.blue, // Use your primary color here
         elevation: 0,
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -20,7 +20,7 @@ class InventoryPage extends StatelessWidget {
         builder: (context, inventory) {
           if (!inventory.hasData) {
             return CircularProgressIndicator(
-              color: primaryColor,
+              color: Colors.blue, // Use your primary color here
             );
           }
 
@@ -73,19 +73,30 @@ class InventoryPage extends StatelessWidget {
                               MyButton(
                                 text: "Update",
                                 onPressed: () async {
-                                  await FirebaseFirestore.instance
-                                      .collection("inventory")
-                                      .doc(inventory.data!.docs[i].id)
-                                      .update({
-                                    "amount": double.parse(
-                                      amountController.text.toString(),
-                                    ),
-                                    "quantity": int.parse(
-                                      qtyController.text.toString(),
-                                    ),
-                                  });
+                                  final double? amount = parseAmount(amountController.text);
+                                  final int? quantity = parseQuantity(qtyController.text);
 
-                                  Navigator.pop(context);
+                                  if (amount != null && quantity != null) {
+                                    try {
+                                      await FirebaseFirestore.instance
+                                          .collection("inventory")
+                                          .doc(inventory.data!.docs[i].id)
+                                          .update({
+                                        "amount": amount,
+                                        "quantity": quantity,
+                                      });
+                                      Navigator.pop(context);
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                            content: Text('Failed to update item: $e')),
+                                      );
+                                    }
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Invalid input.')),
+                                    );
+                                  }
                                 },
                               ),
                             ],
@@ -99,10 +110,17 @@ class InventoryPage extends StatelessWidget {
                         itemAmount: inventory.data!.docs[i].get("amount"),
                         quantity: inventory.data!.docs[i].get("quantity"),
                         onPressed: () async {
-                          await FirebaseFirestore.instance
-                              .collection("inventory")
-                              .doc(inventory.data!.docs[i].id)
-                              .delete();
+                          try {
+                            await FirebaseFirestore.instance
+                                .collection("inventory")
+                                .doc(inventory.data!.docs[i].id)
+                                .delete();
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text('Failed to delete item: $e')),
+                            );
+                          }
                         },
                       ),
                     ),
@@ -134,6 +152,7 @@ class InventoryPage extends StatelessWidget {
                       decoration: InputDecoration(
                         label: Text("Name"),
                       ),
+                      maxLength: 50,
                     ),
                     VerticalSpacer(12),
                     TextField(
@@ -141,6 +160,7 @@ class InventoryPage extends StatelessWidget {
                       decoration: InputDecoration(
                         label: Text("Description"),
                       ),
+                      maxLength: 250,
                     ),
                     VerticalSpacer(12),
                     TextField(
@@ -173,26 +193,30 @@ class InventoryPage extends StatelessWidget {
                 MyButton(
                   text: "Add",
                   onPressed: () async {
-                    await FirebaseFirestore.instance
-                        .collection("inventory")
-                        .add({
-                      "amount": double.parse(
-                        amountController.text.toString(),
-                      ),
-                      "quantity": int.parse(
-                        qtyController.text.toString(),
-                      ),
-                      "name": nameController.text.toString(),
-                      "description": descController.text.toString(),
-                      "imageUrl": [
-                        imageUrlController.text.toString(),
-                        imageUrlController.text.toString(),
-                        imageUrlController.text.toString(),
-                        imageUrlController.text.toString(),
-                      ],
-                    });
+                    final double? amount = parseAmount(amountController.text);
+                    final int? quantity = parseQuantity(qtyController.text);
+                    final String imageUrl = imageUrlController.text;
 
-                    Navigator.pop(context);
+                    if (amount != null && quantity != null && isValidUrl(imageUrl)) {
+                      try {
+                        await FirebaseFirestore.instance.collection("inventory").add({
+                          "amount": amount,
+                          "quantity": quantity,
+                          "name": nameController.text,
+                          "description": descController.text,
+                          "imageUrl": [imageUrl],
+                        });
+                        Navigator.pop(context);
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to add new item: $e')),
+                        );
+                      }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Invalid input or URL.')),
+                      );
+                    }
                   },
                 ),
               ],
@@ -203,75 +227,26 @@ class InventoryPage extends StatelessWidget {
       ),
     );
   }
-}
 
-class MyCard extends StatelessWidget {
-  const MyCard({
-    Key? key,
-    required this.imageUrl,
-    required this.itemName,
-    required this.itemAmount,
-    required this.onPressed,
-    required this.quantity,
-  }) : super(key: key);
+  // Input validation helpers
+  double? parseAmount(String input) {
+    try {
+      return double.parse(input);
+    } catch (e) {
+      return null;
+    }
+  }
 
-  final String imageUrl;
-  final String itemName;
-  final double itemAmount;
-  final int quantity;
-  final VoidCallback onPressed;
+  int? parseQuantity(String input) {
+    try {
+      return int.parse(input);
+    } catch (e) {
+      return null;
+    }
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    double width = MediaQuery.of(context).size.width;
-    return Stack(
-      children: [
-        Container(
-          height: 80 + 2,
-          width: width / 3 + 2,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            color: Colors.grey.withOpacity(0.3),
-          ),
-        ),
-        Container(
-          height: 80,
-          width: width / 3,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            color: Colors.white,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: Image.network(
-                  imageUrl,
-                  height: 50,
-                  width: 50,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              Text(
-                itemName,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
-              ),
-              // Text(
-              //   "Qty: $qty",
-              // ),
-              Text(
-                "\$ ${itemAmount}",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                "Qty: ${quantity}",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+  bool isValidUrl(String url) {
+    final Uri? uri = Uri.tryParse(url);
+    return uri != null && (uri.isScheme('http') || uri.isScheme('https'));
   }
 }

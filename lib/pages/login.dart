@@ -2,10 +2,9 @@ import 'package:ecom_app/components/footer.dart';
 import 'package:ecom_app/components/my_button.dart';
 import 'package:ecom_app/components/my_spacer.dart';
 import 'package:ecom_app/constants.dart';
-import 'package:ecom_app/helpers/change_screen.dart';
-import 'package:ecom_app/pages/home.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -20,6 +19,94 @@ class _LoginPageState extends State<LoginPage> {
 
   bool showLoading = false;
 
+  // Email validation method
+  bool _isValidEmail(String email) {
+    final RegExp emailRegExp = RegExp(
+        r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9]+\.[a-zA-Z]+");
+    return emailRegExp.hasMatch(email);
+  }
+
+  // Password validation method (basic example with minimum length check)
+  bool _isValidPassword(String password) {
+    return password.isNotEmpty &&
+        password.length >= 6; // Password must be at least 6 characters
+  }
+
+  Future<void> _handleSubmit() async {
+    // Input validation
+    if (!_isValidEmail(emailController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid email format")),
+      );
+      return;
+    }
+
+    if (!_isValidPassword(passwordController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Password must be at least 6 characters")),
+      );
+      return;
+    }
+
+    bool changePage = false;
+    setState(() {
+      showLoading = true;
+    });
+
+    try {
+      UserCredential user =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailController.text,
+        password: passwordController.text,
+      );
+      changePage = true;
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = "An error occurred";
+      if (e.code == 'user-not-found') {
+        errorMessage = "No user found for this email.";
+      } else if (e.code == 'wrong-password') {
+        errorMessage = "Incorrect password.";
+      } else if (e.code == 'invalid-email') {
+        errorMessage = "Invalid email address.";
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    } finally {
+      setState(() {
+        showLoading = false;
+      });
+    }
+
+    // Clear the fields only if login is successful
+    if (changePage) {
+      emailController.clear();
+      passwordController.clear();
+      Navigator.pop(context);
+    }
+  }
+
+  final _auth = FirebaseAuth.instance;
+
+  Future<UserCredential?> loginWithGogle() async{
+    try{
+
+      final googleUser = await GoogleSignIn().signIn();
+      final googleAuth = await googleUser?.authentication;
+
+      final cred = GoogleAuthProvider.credential(
+        idToken: googleAuth?.idToken,
+        accessToken: googleAuth?.accessToken
+      );
+
+      return await _auth.signInWithCredential(cred);
+
+    }
+    catch(e){
+      print(e.toString());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,7 +120,7 @@ class _LoginPageState extends State<LoginPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            const Text(
               "Sign In",
               style: TextStyle(
                 fontWeight: FontWeight.bold,
@@ -72,33 +159,17 @@ class _LoginPageState extends State<LoginPage> {
                 ? CircularProgressIndicator(
                     color: primaryColor,
                   )
-                : MyButton(
-                    text: "Submit",
-                    onPressed: () async {
-                      bool changePage = false;
-                      showLoading = true;
-                      setState(() {});
-                      try {
-                        UserCredential user = await FirebaseAuth.instance
-                            .signInWithEmailAndPassword(
-                          email: emailController.text,
-                          password: passwordController.text,
-                        );
-                        changePage = true;
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text("Error occured while Logging In")));
-                      } finally {
-                        showLoading = false;
-                        setState(() {});
-
-                        emailController.clear();
-                        passwordController.clear();
-                      }
-                      if (changePage) Navigator.pop(context);
-
-                      // changeScreenWithReplacement(context, HomePage());
-                    },
+                : Column(
+                    children: [
+                      MyButton(
+                        text: "Submit",
+                        onPressed: () => showLoading ? null : _handleSubmit(),
+                      ),
+                      MyButton(
+                        text: "Sign in with Google",
+                        onPressed: () => showLoading ? null :loginWithGogle(),
+                      ),
+                    ],
                   ),
           ],
         ),

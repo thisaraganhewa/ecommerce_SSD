@@ -193,7 +193,7 @@ class _ItemDetailsPageState extends State<ItemDetailsPage> {
                                 item.get("amount").toString(),
                                 item.get("name"),
                                 item.get("imageUrl")[0],
-                                int.parse(qtyController.text),
+                                int.parse(qtyController.text), itemId: '', itemAmount: '', itemName: '', imageUrl: '', quantity: 0,
                               ),
                             );
 
